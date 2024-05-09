@@ -1,12 +1,6 @@
 import { connect, keyStores, utils } from 'near-api-js';
-//import dotenv from 'dotenv';
-//dotenv.config();
-
-//const privateKey = process.env.PRIVATE_KEY
-//const keyPair = utils.KeyPair.fromString(privateKey);
 
 const keyStore = new keyStores.InMemoryKeyStore();
-//keyStore.setKey('testnet', 'example-account.testnet', keyPair);
 
 const providers = {
     "NEAR": "https://rpc.mainnet.near.org",
@@ -28,14 +22,15 @@ const providers = {
     "Seracle": "https://api.seracle.com/saas/baas/rpc/near/mainnet/public"
 };
 
-// const config = {
-//     keyStore,
-//     networkId: 'mainnet',
-//     nodeUrl: 'https://rpc.mainnet.near.org',
-//     walletUrl: 'https://wallet.mainnet.near.org',
-//     helperUrl: 'https://helper.mainnet.near.org',
-//     explorerUrl: 'https://explorer.mainnet.near.org'
-// };
+function calculateMedian(values) {
+    const sortedValues = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sortedValues.length / 2);
+    if (sortedValues.length % 2 === 0) {
+        return (sortedValues[mid - 1] + sortedValues[mid]) / 2;
+    } else {
+        return sortedValues[mid];
+    }
+}
 
 async function getLatestBlockOnEveryProvider() {
 
@@ -58,6 +53,8 @@ async function getLatestBlockOnEveryProvider() {
 
     const results = await Promise.allSettled(promises);
 
+    console.log("\nAll the results --------------------------------------------\n");
+
     results.forEach(result => {
         if (result.status === 'fulfilled') {
             const { providerName, latestBlockHeight, error } = result.value;
@@ -72,6 +69,33 @@ async function getLatestBlockOnEveryProvider() {
         }
     });
 
+    console.log("\nActive nodes -----------------------------------------------\n");
+
+    const successfulResults = results.filter(result => result.status === 'fulfilled' && !result.value.error);
+
+    successfulResults.forEach(result => {
+        const { providerName, latestBlockHeight } = result.value;
+        console.log(`Provider: ${providerName}, Latest Block Height: ${latestBlockHeight}`)
+    });
+
+
+    // delayed nodes
+
+    const latestBlockHeights = successfulResults.map(x => x.value.latestBlockHeight);
+    const medianBlockHeight = calculateMedian(latestBlockHeights);
+    console.log(`\nMedian Block Height: ${medianBlockHeight}`)
+
+
+    console.log("\nDelayed nodes ----------------------------------------------\n");
+
+
+    const deviationThreshold = 10;
+    const delayedResults = successfulResults.filter(result => Math.abs(result.value.latestBlockHeight - medianBlockHeight) > deviationThreshold);
+
+    delayedResults.forEach(result => {
+        const { providerName, latestBlockHeight } = result.value;
+        console.log(`Provider: ${providerName}, Latest Block Height: ${latestBlockHeight}`)
+    });
 }
 
 getLatestBlockOnEveryProvider();
